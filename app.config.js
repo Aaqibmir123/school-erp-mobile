@@ -29,9 +29,6 @@ const fallbackConfig = {
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
   },
-  web: {
-    favicon: "./assets/images/fIcon.png",
-  },
   extra: {},
 };
 

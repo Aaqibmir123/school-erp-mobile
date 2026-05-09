@@ -13,7 +13,6 @@
     "**/*.tsx"
   ],
   "exclude": [
-    "backend",
-    "test-app"
+    "backend"
   ]
 }

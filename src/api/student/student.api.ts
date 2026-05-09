@@ -1,5 +1,28 @@
-import { DashboardData } from "../../../shared-types/dashboard";
 import { baseApi } from "../../api/baseQuery";
+
+type DashboardData = {
+  attendance?: {
+    absent?: number;
+    percentage?: number;
+    present?: number;
+    todayStatus?: "PRESENT" | "ABSENT" | "N/A";
+  };
+  className?: string;
+  nextClass?: {
+    endTime?: string;
+    startTime?: string;
+    subject?: string;
+    teacher?: string;
+  } | null;
+  sectionName?: string;
+  stats?: {
+    activeHomeworkCount?: number;
+    pendingFeeCount?: number;
+    upcomingExamCount?: number;
+  };
+  rollNumber?: number | null;
+  studentName?: string;
+};
 
 export const studentApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
