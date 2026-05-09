@@ -8,15 +8,18 @@ import {
   View,
 } from "react-native";
 
+import { useGetSchoolProfileQuery, useGetStudentProgressQuery } from "../../api/teacher/teacherApi";
 import BrandLoader from "@/src/components/BrandLoader";
 import FallbackBanner from "@/src/components/FallbackBanner";
-import { useGetStudentProgressQuery } from "../../api/teacher/teacherApi";
+import RecommendationPanel from "@/src/components/RecommendationPanel";
+import { buildRecommendations } from "@/src/utils/recommendations";
 
 export default function StudentProgressScreen({ route }: any) {
   const { classId, subjectId, sectionId } = route.params;
 
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { data: schoolProfile } = useGetSchoolProfileQuery();
 
   /* ================= RTK QUERY ================= */
   const {
@@ -160,6 +163,38 @@ export default function StudentProgressScreen({ route }: any) {
                     Homework: {item?.homework?.submitted ?? 0}/
                     {item?.homework?.total ?? 0}
                   </Text>
+                  <View style={styles.recommendationWrap}>
+                    <RecommendationPanel
+                      audience="teacher"
+                      title="Teacher actions"
+                      subtitle="Use these suggestions to plan extra support and parent follow-up."
+                      items={buildRecommendations(
+                        "teacher",
+                        {
+                          attendancePercent: item?.attendancePercentage ?? null,
+                          averageMarks: item?.averageMarks ?? item?.marks ?? null,
+                          className: item?.className ?? null,
+                          homeworkPending:
+                            Math.max(
+                              (item?.homework?.total ?? 0) -
+                                (item?.homework?.submitted ?? 0),
+                              0,
+                            ) || null,
+                          sectionName: item?.sectionName ?? null,
+                          studentName: name,
+                          subjects: Array.isArray(item?.weakSubjects)
+                            ? item.weakSubjects
+                            : [],
+                          trend:
+                            item?.status === "weak" || item?.status === "careless"
+                              ? "declining"
+                              : "stable",
+                          upcomingExams: item?.upcomingExams ?? null,
+                        },
+                        (schoolProfile as any)?.recommendationConfig,
+                      )}
+                    />
+                  </View>
                 </View>
               )}
             </View>
@@ -239,5 +274,8 @@ const styles = StyleSheet.create({
 
   details: {
     marginTop: 10,
+  },
+  recommendationWrap: {
+    marginTop: 12,
   },
 });

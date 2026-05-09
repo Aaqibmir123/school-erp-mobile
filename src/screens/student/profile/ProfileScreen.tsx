@@ -5,12 +5,20 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import {
+  useGetAttendanceSummaryQuery,
+  useGetMyFeesQuery,
+  useGetMyMarksQuery,
+  useUpdateStudentProfileMutation,
+} from "@/src/api/student/student.api";
+import { useGetSchoolProfileQuery } from "@/src/api/teacher/teacherApi";
 import FallbackBanner from "@/src/components/FallbackBanner";
+import RecommendationPanel from "@/src/components/RecommendationPanel";
 import { APP_ENV } from "@/src/config/env";
-import { useUpdateStudentProfileMutation } from "@/src/api/student/student.api";
 import { useAuth } from "@/src/context/AuthContext";
 import { COLORS, RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from "@/src/theme";
 import { showToast } from "@/src/utils/toast";
+import { buildRecommendations, type RecommendationAudience } from "@/src/utils/recommendations";
 import { STUDENT_GLAS_CARD, STUDENT_THEME } from "../studentTheme";
 
 const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
@@ -60,9 +68,21 @@ const ProfileItem = ({
 );
 
 export default function ProfileScreen() {
-  const { selectedStudent, setSelectedStudent } = useAuth();
+  const { role, selectedStudent, setSelectedStudent } = useAuth();
   const [updateProfile, { isLoading }] = useUpdateStudentProfileMutation();
   const [localImage, setLocalImage] = useState<string | null>(null);
+  const { data: schoolProfile } = useGetSchoolProfileQuery();
+  const { data: attendanceSummary } = useGetAttendanceSummaryQuery(
+    { studentId: selectedStudent?._id! },
+    { skip: !selectedStudent?._id },
+  );
+  const { data: marksCard } = useGetMyMarksQuery(
+    { studentId: selectedStudent?._id! },
+    { skip: !selectedStudent?._id },
+  );
+  const { data: feeItems = [] } = useGetMyFeesQuery(undefined, {
+    skip: !selectedStudent?._id,
+  });
 
   const studentName = useMemo(() => {
     if (!selectedStudent) return "";
@@ -87,6 +107,70 @@ export default function ProfileScreen() {
   const currentImage = resolveImageUri(
     localImage || selectedStudent?.profileImage || null,
   );
+  const averageMarks = Number((marksCard as any)?.summary?.percentage || 0);
+
+  const recommendationAudience: RecommendationAudience =
+    String(role || "").toUpperCase() === "PARENT" ? "parent" : "student";
+
+  const recommendationItems = useMemo(() => {
+    const summary = (marksCard as any)?.summary || {};
+    const subjects = Array.isArray((marksCard as any)?.subjects)
+      ? (marksCard as any).subjects
+      : [];
+    const weakSubjects = subjects
+      .filter((subject: any) => {
+        if (typeof subject?.obtained !== "number" || typeof subject?.max !== "number") {
+          return false;
+        }
+
+        const percentage = (subject.obtained / Math.max(subject.max, 1)) * 100;
+        return percentage < 60;
+      })
+      .map((subject: any) => subject?.name)
+      .filter(Boolean)
+      .slice(0, 3);
+
+    const feePending = feeItems.filter((item: any) => Number(item?.remainingAmount || 0) > 0).length;
+    const attendancePercent = Number(
+      attendanceSummary?.percentage ||
+        attendanceSummary?.data?.percentage ||
+        summary?.attendancePercentage ||
+        0,
+    );
+    return buildRecommendations(
+      recommendationAudience,
+      {
+        attendancePercent: attendancePercent || null,
+        averageMarks: averageMarks || null,
+        className: selectedStudent?.classId?.name || null,
+        feePending,
+        homeworkPending: Number(
+          (attendanceSummary as any)?.homeworkPending ||
+            (attendanceSummary as any)?.stats?.activeHomeworkCount ||
+            0,
+        ),
+        sectionName: selectedStudent?.sectionId?.name || null,
+        studentName,
+        subjects: weakSubjects,
+        trend:
+          attendancePercent > 0 && averageMarks > 0 && attendancePercent < 80 && averageMarks < 65
+            ? "declining"
+            : "stable",
+        upcomingExams: Number((attendanceSummary as any)?.upcomingExams || 0),
+      },
+      (schoolProfile as any)?.recommendationConfig,
+    );
+  }, [
+    attendanceSummary,
+    averageMarks,
+    feeItems,
+    marksCard,
+    recommendationAudience,
+    schoolProfile,
+    selectedStudent?.classId?.name,
+    selectedStudent?.sectionId?.name,
+    studentName,
+  ]);
 
   const uploadPhoto = useCallback(async () => {
     if (!selectedStudent?._id) return;
@@ -213,6 +297,15 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.card}>
+          <View style={styles.recommendationWrap}>
+            <RecommendationPanel
+              audience={recommendationAudience}
+              title="Student guidance"
+              subtitle="Actionable advice is generated from attendance, marks, fees, and school rules."
+              items={recommendationItems}
+            />
+          </View>
+
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Profile Details</Text>
             <Text style={styles.sectionHint}>Linked account</Text>
@@ -378,6 +471,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: SPACING.lg,
     padding: SPACING.lg,
+  },
+  recommendationWrap: {
+    marginBottom: SPACING.lg,
   },
   sectionHeader: {
     alignItems: "center",
