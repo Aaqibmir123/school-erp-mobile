@@ -33,8 +33,29 @@ export interface ApiEnvelope<T> {
 const extractErrorMessage = (error: unknown, fallback: string) => {
   if (isAxiosError(error)) {
     const status = error.response?.status;
+    const method = String(error.config?.method || "GET").toUpperCase();
+    const url = String(error.config?.url || "");
     const code = String(error.code || "").toUpperCase();
     const message = String(error.message || "").toLowerCase();
+    const responseData = error.response?.data as
+      | { message?: unknown; error?: unknown; detail?: unknown }
+      | string
+      | undefined;
+
+    const preview =
+      typeof responseData === "string"
+        ? responseData.slice(0, 240)
+        : responseData && typeof responseData === "object"
+          ? JSON.stringify(responseData).slice(0, 240)
+          : undefined;
+
+    console.error("[apiClient] request failed", {
+      code,
+      method,
+      status,
+      url,
+      preview,
+    });
 
     if (
       code === "ERR_NETWORK" ||
@@ -51,21 +72,14 @@ const extractErrorMessage = (error: unknown, fallback: string) => {
       return "Too many attempts, try later";
     }
 
-    if (status && status >= 500) {
-      return "Server busy";
-    }
-
-    if (!error.response) {
-      return "Server busy";
-    }
-
-    const responseData = error.response?.data as
-      | { message?: unknown; error?: unknown; detail?: unknown }
-      | string
-      | undefined;
-
     if (typeof responseData === "string" && responseData.trim()) {
-      return responseData.trim();
+      const trimmed = responseData.trim();
+
+      if (/^<!doctype html/i.test(trimmed) || /^<html[\s>]/i.test(trimmed)) {
+        return "Server busy";
+      }
+
+      return trimmed;
     }
 
     if (responseData && typeof responseData === "object") {
@@ -75,6 +89,14 @@ const extractErrorMessage = (error: unknown, fallback: string) => {
       if (typeof candidate === "string" && candidate.trim()) {
         return candidate.trim();
       }
+    }
+
+    if (status && status >= 500) {
+      return "Server busy";
+    }
+
+    if (!error.response) {
+      return "Server busy";
     }
 
     if (typeof error.message === "string" && error.message.trim()) {
