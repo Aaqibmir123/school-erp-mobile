@@ -16,7 +16,7 @@ const fallbackConfig = {
   splash: {
     image: "./assets/images/splash.png",
     resizeMode: "contain",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#0B4DCA",
   },
   assetBundlePatterns: ["**/*"],
   ios: {
@@ -24,9 +24,8 @@ const fallbackConfig = {
   },
   android: {
     adaptiveIcon: {
-      foregroundImage: "./assets/images/android-icon-foreground.png",
-      backgroundImage: "./assets/images/android-icon-background.png",
-      monochromeImage: "./assets/images/android-icon-monochrome.png",
+      foregroundImage: "./assets/images/AppIcon.png",
+      backgroundColor: "#FFFFFF",
     },
   },
   extra: {},
